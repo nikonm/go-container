@@ -34,7 +34,38 @@ func main() {
 			NewService1,
 		},
 	})
-    service2, err := container.GetService("Service2").(*Service2) // Returning Service2 instance
+    service2 := container.GetService("Service2").(*Service2) // Returning Service2 instance
+
+    err := container.StopAll() // Call all Stop functions in each service(Graceful exit) 
+}
+```
+
+#### Example with `NamedOptions`
+ ```go
+type Service1 struct {
+    Service2 *Service2 
+}
+func NewService1(s *Service2) (*Service1, error) {
+	return &Service1{Service2: s}, nil
+}
+
+type Service2 struct {}
+func (s2 *Service2) Stop() error {
+    return nil
+}
+
+func NewService2() (*Service2, error) {
+	return &Service2{}, nil
+}
+
+func main() {
+    const serv2  = "custom_name2"
+    container, err := NewNamed(&NamedOptions{
+                      		Services: map[string]interface{}{
+                      			serv2: NewService2,
+                      		},
+                      	})
+    service2 := container.GetService(serv2).(*Service2) // Returning Service2 instance
 
     err := container.StopAll() // Call all Stop functions in each service(Graceful exit) 
 }

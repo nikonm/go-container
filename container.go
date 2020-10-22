@@ -13,23 +13,28 @@ type Stopper interface {
 }
 
 type Container struct {
-	basePkg     string
-	rawServices map[string]interface{}
-	services    map[string]interface{}
-	stoppes     []func() error
+	notFoundPanic bool
+	basePkg       string
+	names         map[string]string
+	rawServices   map[string]interface{}
+	services      map[string]interface{}
+	stoppes       []func() error
 }
 
 // Retrieve service by keyName
-func (c *Container) GetService(key string) (interface{}, error) {
+func (c *Container) GetService(key string) interface{} {
+	if len(c.names) > 0 {
+		key = c.names[key]
+	}
 	if c.basePkg != "" && strings.Index(key, ".") == -1 {
 		key = c.basePkg + "." + key
 	}
 
 	s, ok := c.services[key]
-	if !ok {
-		return nil, c.error(key, errors.ServiceNotFound)
+	if !ok && c.notFoundPanic {
+		panic(c.error(key, errors.ServiceNotFound))
 	}
-	return s, nil
+	return s
 }
 
 // Stopping all services which implements Stopper
@@ -132,12 +137,54 @@ func New(opt *Options) (*Container, error) {
 		return nil, err
 	}
 	c := &Container{
-		basePkg:     opt.BasePkg,
-		rawServices: rs,
-		services:    map[string]interface{}{},
+		notFoundPanic: opt.NotFoundPanic,
+		basePkg:       opt.BasePkg,
+		rawServices:   rs,
+		services:      map[string]interface{}{},
 	}
 
 	return c.init()
+}
+
+func NewNamed(opt *NamedOptions) (*Container, error) {
+	rs, names, err := opt.getServices()
+	if rs == nil {
+		return nil, err
+	}
+	c := &Container{
+		notFoundPanic: opt.NotFoundPanic,
+		rawServices:   rs,
+		services:      map[string]interface{}{},
+		names:         names,
+	}
+
+	return c.init()
+}
+
+type NamedOptions struct {
+	// List of service constructor function, ex. func(s *OtherService) (*Service, error)
+	Services map[string]interface{}
+
+	NotFoundPanic bool
+}
+
+func (opt *NamedOptions) getServices() (map[string]interface{}, map[string]string, errors.Error) {
+	services := map[string]interface{}{}
+	keys := map[string]string{}
+	for key, sFn := range opt.Services {
+		vt := reflect.TypeOf(sFn)
+
+		if vt.NumOut() < 1 {
+			return nil, nil, errors.InvalidInitSign
+		}
+		val := vt.Out(0)
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+		services[val.String()] = sFn
+		keys[key] = val.String()
+	}
+	return services, keys, errors.Error{}
 }
 
 type Options struct {
@@ -145,6 +192,8 @@ type Options struct {
 	BasePkg string
 	// List of service constructor function, ex. func(s *OtherService) (*Service, error)
 	Services []interface{}
+
+	NotFoundPanic bool
 }
 
 func (opt *Options) getServices() (map[string]interface{}, errors.Error) {

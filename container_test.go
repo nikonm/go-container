@@ -41,9 +41,39 @@ func TestNew(t *testing.T) {
 		return
 	}
 	require.NotNil(t, c)
-	s, err := c.GetService("mockService3")
+	s := c.GetService("mockService3")
 	_, ok := s.(*mockService3)
 	require.True(t, ok)
+}
+
+func TestNewNamed(t *testing.T) {
+	t.Parallel()
+	const n3 = "test3"
+	c, err := NewNamed(&NamedOptions{
+		Services: map[string]interface{}{
+			"test2": New2,
+			n3:      New3,
+			"test1": New1,
+		},
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	require.NotNil(t, c)
+	s := c.GetService(n3)
+	_, ok := s.(*mockService3)
+	require.True(t, ok)
+}
+
+func TestNewNamedSignErr(t *testing.T) {
+	t.Parallel()
+	_, err := NewNamed(&NamedOptions{
+		Services: map[string]interface{}{
+			"test1": func() {},
+		},
+	})
+	require.Equal(t, errors.InvalidInitSign.GetMsg(), err.(errors.Error).GetMsg())
 }
 
 type mockService4 struct{}
@@ -59,6 +89,7 @@ func New5(s *mockService4) (*mockService5, error) {
 }
 
 func TestCircleError(t *testing.T) {
+
 	t.Parallel()
 	_, err := New(&Options{
 		BasePkg: "go_container",
@@ -84,9 +115,9 @@ func TestErrorSign(t *testing.T) {
 
 func TestErrorServiceNotFound(t *testing.T) {
 	t.Parallel()
-	c, _ := New(&Options{})
-	_, err := c.GetService("service")
-	require.Equal(t, errors.ServiceNotFound.GetMsg(), err.(errors.Error).GetMsg())
+	c, _ := New(&Options{NotFoundPanic: false})
+	s := c.GetService("service")
+	require.Nil(t, s)
 }
 
 func TestErrorInvalidOutArgumentsCount(t *testing.T) {
