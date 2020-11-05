@@ -73,10 +73,9 @@ func (c *Container) initService(name string, fn interface{}, chain map[string]bo
 		if v3.String() != "error" {
 			return c.error(name, errors.InvalidOutSign)
 		}
-
 		if v.NumIn() > 0 {
 			for i := 0; i < v.NumIn(); i++ {
-				val := v.In(0)
+				val := v.In(i)
 				var cKey string
 
 				switch val.Kind() {
@@ -95,16 +94,28 @@ func (c *Container) initService(name string, fn interface{}, chain map[string]bo
 					if chain == nil {
 						chain = make(map[string]bool)
 					}
-					if _, ok := chain[name]; ok {
+					if _, ok := chain[name+val.String()]; ok {
 						return c.error(name, errors.CircleLoop)
 					}
-					chain[name] = true
+					chain[name+val.String()] = true
 					if err := c.initService(cKey, rawArg, chain); err != nil {
 						return err
 					}
 					arg = c.services[cKey]
 				}
-				args = append(args, reflect.ValueOf(arg))
+				argV := reflect.ValueOf(arg)
+				if val.Kind() == argV.Kind() {
+					args = append(args, argV)
+				} else {
+					if argV.Kind() == reflect.Ptr {
+						argV = argV.Elem()
+					} else {
+						argVPtr := reflect.New(argV.Type())
+						argVPtr.Elem().Set(argV)
+						argV = argVPtr
+					}
+					args = append(args, argV)
+				}
 			}
 		}
 		r := reflect.ValueOf(fn).Call(args)

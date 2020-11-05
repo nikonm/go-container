@@ -8,6 +8,18 @@ import (
 	"testing"
 )
 
+type mockService0 struct{}
+
+func New0() (*mockService0, error) {
+	return &mockService0{}, nil
+}
+
+type mockService00 struct{}
+
+func New00() (mockService00, error) {
+	return mockService00{}, nil
+}
+
 type mockService1 struct{}
 
 func New1(s *mockService2) (*mockService1, error) {
@@ -22,7 +34,7 @@ func New2(s *mockService3) (*mockService2, error) {
 
 type mockService3 struct{}
 
-func New3() (*mockService3, error) {
+func New3(s0 mockService0, s *mockService00) (*mockService3, error) {
 	return &mockService3{}, nil
 }
 
@@ -33,7 +45,9 @@ func TestNew(t *testing.T) {
 		Services: []interface{}{
 			New2,
 			New3,
+			New0,
 			New1,
+			New00,
 		},
 	})
 	if err != nil {
@@ -51,9 +65,11 @@ func TestNewNamed(t *testing.T) {
 	const n3 = "test3"
 	c, err := NewNamed(&NamedOptions{
 		Services: map[string]interface{}{
-			"test2": New2,
-			n3:      New3,
-			"test1": New1,
+			"test2":  New2,
+			n3:       New3,
+			"test1":  New1,
+			"test0":  New0,
+			"test00": New00,
 		},
 	})
 	if err != nil {
